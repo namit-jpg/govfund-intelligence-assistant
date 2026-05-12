@@ -1,0 +1,1 @@
+Compare competitors using aggregated metrics only.

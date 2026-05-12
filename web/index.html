@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GovFund Intelligence Assistant</title>
+    <link rel="stylesheet" href="/app/styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Funding Intelligence</p>
+        <h1>GovFund Intelligence Assistant</h1>
+        <p class="subhead">Ask plain-language questions over source-backed campaign finance records.</p>
+      </div>
+      <div id="apiStatus" class="status-pill">Checking API</div>
+    </header>
+
+    <main>
+      <section class="caveat">
+        FEC employer fields represent the employer reported by individual contributors. They do not prove direct corporate donations.
+      </section>
+
+      <nav class="tabs" aria-label="Portal navigation">
+        <button class="tab active" data-page="ai">AI Intelligence Query</button>
+        <button class="tab" data-page="tracker">Tracker</button>
+        <button class="tab" data-page="overview">Overview</button>
+        <button class="tab" data-page="search">Search Donations</button>
+        <button class="tab" data-page="fec">FEC Data Pull</button>
+        <button class="tab" data-page="data">Data & Exports</button>
+        <button class="tab" data-page="architecture">Architecture</button>
+      </nav>
+
+      <section id="toast" class="toast hidden"></section>
+      <section id="page"></section>
+    </main>
+
+    <template id="fecTemplate">
+      <div class="grid two">
+        <section class="panel">
+          <div class="section-title">
+            <h2>FEC Query</h2>
+            <span>OpenFEC Schedule A</span>
+          </div>
+          <form id="fecForm" class="form-grid">
+            <label>Contributor name<input name="contributor_name" /></label>
+            <label>Employer / company signal<input name="contributor_employer" /></label>
+            <label>State<input name="contributor_state" placeholder="TX" maxlength="2" /></label>
+            <label>City<input name="contributor_city" /></label>
+            <label>Committee ID<input name="committee_id" /></label>
+            <label>Candidate ID<input name="candidate_id" /></label>
+            <label>Cycle / two-year period<input name="two_year_transaction_period" placeholder="2024" /></label>
+            <label>Max records<input name="max_records" type="number" min="1" max="100000" step="1" value="50" /></label>
+            <label>Min date<input name="min_date" type="date" /></label>
+            <label>Max date<input name="max_date" type="date" /></label>
+            <label>Min amount<input name="min_amount" type="number" min="0" step="100" /></label>
+            <label>Max amount<input name="max_amount" type="number" min="0" step="100" /></label>
+            <button class="primary span-all" type="submit">Submit FEC Query</button>
+          </form>
+        </section>
+
+        <section class="panel">
+          <div class="section-title">
+            <h2>Stored Snapshots</h2>
+            <button id="refreshRuns" class="ghost" type="button">Refresh</button>
+          </div>
+          <label class="full">Snapshot<select id="runSelect"></select></label>
+          <div id="runSummary" class="metric-grid"></div>
+          <button id="downloadXlsx" class="secondary" type="button">Download Stored XLSX</button>
+        </section>
+      </div>
+
+      <section class="panel">
+        <div class="section-title">
+          <h2>FEC Results</h2>
+          <span id="fecResultCaption">Select or run a query.</span>
+        </div>
+        <div id="fecTable"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">
+          <h2>Query Charts</h2>
+          <span>Built from the selected stored snapshot</span>
+        </div>
+        <div id="fecCharts" class="chart-grid"></div>
+      </section>
+    </template>
+
+    <script src="/app/app.js" defer></script>
+  </body>
+</html>
