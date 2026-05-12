@@ -510,45 +510,6 @@ function renderTracker() {
   });
 }
 
-function renderArchitecture() {
-  page.innerHTML = `
-    <section class="panel">
-      <div class="section-title"><h2>Backend Pipes</h2><span>Defensible technical outline</span></div>
-      <div class="architecture-flow">
-        <div><strong>Public Sources</strong><p>OpenFEC Schedule A API and imported official TEC CSV/XLSX files.</p></div>
-        <div><strong>Python API</strong><p>FastAPI routes handle ingestion, search, analytics, AI, and exports.</p></div>
-        <div><strong>Storage</strong><p>SQLite locally through DATABASE_URL; schema is SQLAlchemy-based and can move to Postgres.</p></div>
-        <div><strong>Evidence Layer</strong><p>Raw records, normalized transactions, source audit logs, data quality flags, and FEC query snapshots.</p></div>
-        <div><strong>UI</strong><p>Fast JavaScript portal served by FastAPI at /app/. Streamlit is retained only as a handoff.</p></div>
-      </div>
-    </section>
-    <section class="panel">
-      <div class="section-title"><h2>US Tooling / Political-Use Notes</h2><span>What is used, what is configurable</span></div>
-      <div class="two-column-list">
-        <div>
-          <h3>Currently Used</h3>
-          <ul>
-            <li>OpenFEC official public API for federal campaign finance records.</li>
-            <li>Local server-side Python backend; no FEC key is exposed to the browser.</li>
-            <li>Local SQLite database for MVP evidence storage.</li>
-            <li>OpenAI only when OPENAI_API_KEY is configured; otherwise AI is disabled.</li>
-          </ul>
-        </div>
-        <div>
-          <h3>Production Options</h3>
-          <ul>
-            <li>Move database to US-hosted Postgres.</li>
-            <li>Use Azure OpenAI or another approved US-region AI endpoint if required.</li>
-            <li>Add authentication, audit access logs, and role-based permissions.</li>
-            <li>Add background ingestion jobs and monitored alert delivery.</li>
-          </ul>
-        </div>
-      </div>
-      <div class="warning">Political-use caveat: the system reports public-record activity and cautious interpretation only. It does not infer donor intent, wrongdoing, pay-to-play, bribery, or direct corporate donations from FEC employer fields.</div>
-    </section>
-  `;
-}
-
 async function renderData() {
   const [transactions, raw, audits, flags] = await Promise.all([
     api("/transactions?limit=100"),
@@ -600,7 +561,6 @@ async function render() {
     else if (state.page === "fec") await renderFec();
     else if (state.page === "overview") await renderOverview();
     else if (state.page === "search") await renderSearch();
-    else if (state.page === "architecture") renderArchitecture();
     else await renderData();
   } catch (error) {
     page.innerHTML = `<div class="error">${esc(error.message)}</div>`;

@@ -574,30 +574,6 @@ pre {
   line-height: 1.5;
 }
 
-.architecture-flow {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.architecture-flow > div {
-  border: 1px solid #bfdbfe;
-  background: #f8fbff;
-  border-radius: 12px;
-  padding: 14px;
-  position: relative;
-}
-
-.architecture-flow strong {
-  color: #172554;
-}
-
-.architecture-flow p {
-  color: #334155;
-  line-height: 1.45;
-  margin-bottom: 0;
-}
-
 .two-column-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -625,7 +601,6 @@ pre {
   .form-grid,
   .chart-grid,
   .tracker-grid,
-  .architecture-flow,
   .two-column-list {
     grid-template-columns: 1fr;
   }
