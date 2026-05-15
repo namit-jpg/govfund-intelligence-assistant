@@ -23,6 +23,8 @@ def main() -> None:
     from backend.services.normalizer import tag_transaction_topics
     from backend.services.repository import insert_records, serialize_model
     from backend.services.tec_parser import parse_tec_file, preview_tec_file
+    from backend.schemas import WatchlistCreateRequest
+    from backend.services.tracker_service import create_watchlist_from_payload, linked_watchlist_transactions, run_watchlist
 
     init_database()
     db = SessionLocal()
@@ -45,12 +47,27 @@ def main() -> None:
             "recipient_name": "Friends of Infrastructure",
             "committee_name": "Friends of Infrastructure",
             "description": "Infrastructure committee receipt",
+            "cycle": "2024",
             "_raw_payload": {"sub_id": "SMOKE-FEC-1"},
         }
         first = insert_records(db, "FEC", [record])
         second = insert_records(db, "FEC", [record])
         assert first["inserted_count"] == 1
         assert second["duplicate_count"] == 1
+
+        watchlist = create_watchlist_from_payload(
+            db,
+            WatchlistCreateRequest(
+                name="Smoke tracker",
+                watchlist_type="donation_monitor",
+                entities=[{"entity_name": "Acme Construction", "entity_type": "EMPLOYER_SIGNAL"}],
+                filters={"cycle": "2024", "max_records": 50},
+                max_records=50,
+            ),
+        )
+        tracker_run = run_watchlist(db, watchlist.id, live=False)
+        assert tracker_run["matched_count"] == 1
+        assert len(linked_watchlist_transactions(db, watchlist.id)) == 1
 
         tags = tag_transaction_topics({"recipient_name": "Citizens for Roads and Water"})
         assert {"Roads", "Water"} & {item["tag"] for item in tags}

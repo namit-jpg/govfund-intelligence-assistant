@@ -38,3 +38,6 @@ class WatchlistCreateRequest(BaseModel):
     watchlist_type: str = "entity"
     entities: list[dict] = Field(default_factory=list)
     filters: dict = Field(default_factory=dict)
+    cadence: str = "daily"
+    max_records: int = 250
+    enabled: bool = True

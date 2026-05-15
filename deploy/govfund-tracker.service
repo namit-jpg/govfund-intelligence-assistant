@@ -1,0 +1,11 @@
+[Unit]
+Description=GovFund daily tracker ingestion
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=namit
+WorkingDirectory=/home/namit/govfund
+EnvironmentFile=/home/namit/govfund/.env
+ExecStart=/home/namit/govfund/.venv/bin/python /home/namit/govfund/scripts/run_watchlist_trackers.py
+

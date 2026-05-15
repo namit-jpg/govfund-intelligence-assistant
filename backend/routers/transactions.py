@@ -4,10 +4,11 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from backend.db import get_db
-from backend.models import DataQualityFlag, NormalizedTransaction, RawRecord, Watchlist, WatchlistEntity
+from backend.models import DataQualityFlag, NormalizedTransaction, RawRecord, Watchlist
 from backend.services.analytics_service import apply_filters
 from backend.services.entity_matcher import build_match_explanation, match_transaction_to_watchlist
 from backend.services.repository import serialize_model
+from backend.services.tracker_service import watchlist_payload, watchlist_transactions_query
 
 router = APIRouter(prefix="/transactions")
 
@@ -54,12 +55,7 @@ def _get_watchlist_payload(db: Session, watchlist_id: int | None):
     watchlist = db.query(Watchlist).filter(Watchlist.id == watchlist_id).one_or_none()
     if not watchlist:
         return None
-    entities = db.query(WatchlistEntity).filter(WatchlistEntity.watchlist_id == watchlist.id).all()
-    return {
-        "id": watchlist.id,
-        "name": watchlist.name,
-        "entities": [{"entity_name": entity.entity_name, "entity_type": entity.entity_type} for entity in entities],
-    }
+    return watchlist_payload(db, watchlist)
 
 
 @router.get("")
@@ -103,7 +99,11 @@ def list_transactions(
         "topic_tag": topic_tag,
         "transaction_type": transaction_type,
     }
-    query = apply_filters(db.query(NormalizedTransaction), filters)
+    watchlist_row = db.query(Watchlist).filter(Watchlist.id == watchlist_id).one_or_none() if watchlist_id else None
+    if watchlist_row:
+        query, _ = watchlist_transactions_query(db, watchlist_row, filters)
+    else:
+        query = apply_filters(db.query(NormalizedTransaction), filters)
     if data_quality_flag:
         ids = [
             row[0]

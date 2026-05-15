@@ -4,13 +4,13 @@ import json
 import os
 import re
 from collections import Counter, defaultdict
-from datetime import date
+from datetime import date, datetime
 
 import requests
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
-from backend.models import FECQueryRun, InsightRun, NormalizedTransaction
+from backend.models import FECQueryRun, InsightRun, NormalizedTransaction, Watchlist, WatchlistRun
 from backend.services.analytics_service import (
     get_kpis,
     get_recent_high_value_records,
@@ -21,6 +21,7 @@ from backend.services.analytics_service import (
 )
 from backend.services.compliance_guard import check_question
 from backend.services.repository import to_json
+from backend.services.tracker_service import linked_watchlist_transactions, run_watchlist, serialize_watchlist
 
 FOOTER = (
     "This summary is based on public campaign finance records. It is for research and transparency only. "
@@ -29,11 +30,11 @@ FOOTER = (
 
 BRIEF_SECTIONS = [
     "Direct Answer",
-    "What The Records Show",
-    "Relevant Public Context",
+    "Tracked Dataset Evidence",
+    "Live OpenFEC Lookup",
+    "Public Web Context",
     "Strategic Interpretation",
-    "Notable People / Organizations",
-    "Risks, Caveats, And Open Questions",
+    "Coverage Limitations",
     "Recommended Next Research Steps",
 ]
 
@@ -272,6 +273,10 @@ def _facts_from_rows(rows: list[NormalizedTransaction], context: dict) -> dict:
 
 
 def build_deterministic_facts(db: Session, filters: dict) -> dict:
+    if filters.get("watchlist_id"):
+        facts = build_watchlist_facts(db, int(filters["watchlist_id"]))
+        if facts:
+            return facts
     if filters.get("fec_query_run_id"):
         run = db.query(FECQueryRun).filter(FECQueryRun.id == int(filters["fec_query_run_id"])).one_or_none()
         if run:
@@ -365,8 +370,50 @@ def build_deterministic_facts(db: Session, filters: dict) -> dict:
     }
 
 
+def build_watchlist_facts(db: Session, watchlist_id: int) -> dict | None:
+    watchlist = db.query(Watchlist).filter(Watchlist.id == watchlist_id).one_or_none()
+    if not watchlist:
+        return None
+    rows = linked_watchlist_transactions(db, watchlist_id)
+    latest_run = (
+        db.query(WatchlistRun)
+        .filter(WatchlistRun.watchlist_id == watchlist_id)
+        .order_by(WatchlistRun.started_at.desc())
+        .first()
+    )
+    facts = _facts_from_rows(
+        rows,
+        {
+            "watchlist_id": watchlist_id,
+            "watchlist_name": watchlist.name,
+            "selection_method": "tracked_watchlist_records",
+        },
+    )
+    facts["selection_method"] = "tracked_watchlist_records"
+    facts["watchlist"] = serialize_watchlist(db, watchlist)
+    facts["latest_tracker_run"] = {
+        "id": latest_run.id,
+        "status": latest_run.status,
+        "run_type": latest_run.run_type,
+        "started_at": latest_run.started_at.isoformat() if latest_run.started_at else None,
+        "completed_at": latest_run.completed_at.isoformat() if latest_run.completed_at else None,
+        "raw_records_fetched": latest_run.raw_records_fetched,
+        "inserted_count": latest_run.inserted_count,
+        "duplicate_count": latest_run.duplicate_count,
+        "matched_count": latest_run.matched_count,
+        "error_message": latest_run.error_message,
+    } if latest_run else None
+    facts["tracker_evidence_label"] = "Based on tracked records linked to this monitoring list."
+    return facts
+
+
 def build_question_facts(db: Session, question: str, filters: dict | None = None) -> dict:
     filters = filters or {}
+    if filters.get("watchlist_id"):
+        facts = build_watchlist_facts(db, int(filters["watchlist_id"])) or {}
+        facts["question"] = question
+        facts["selection_method"] = "tracked_watchlist_records"
+        return facts
     if filters.get("fec_query_run_id"):
         facts = build_deterministic_facts(db, filters)
         facts["question"] = question
@@ -389,6 +436,96 @@ def build_question_facts(db: Session, question: str, filters: dict | None = None
             "recommended_filters": "Use candidate/committee/recipient-specific OpenFEC identifiers when available; otherwise run a narrowed recipient or committee search and review aliases.",
         }
     return facts
+
+
+def _safe_live_fec_query_from_question(question: str, facts: dict) -> dict | None:
+    context = facts.get("context") or infer_filters_from_question(question)
+    terms = context.get("question_terms") or []
+    if not terms:
+        return None
+    query = {"source_system": "FEC", "per_page": 100, "max_records": 100}
+    if context.get("cycle"):
+        query["two_year_transaction_period"] = str(context["cycle"])
+    focus = context.get("question_focus")
+    first = terms[0]
+    if first.upper().startswith("C"):
+        query["committee_id"] = first
+    elif first[:1].isalpha() and first[1:].isdigit():
+        query["candidate_id"] = first
+    elif focus == "employer":
+        query["contributor_employer"] = first
+    else:
+        return None
+    return {key: value for key, value in query.items() if value not in (None, "", "All")}
+
+
+def _live_fec_fallback(db: Session, question: str, facts: dict) -> dict:
+    if not os.getenv("FEC_API_KEY"):
+        return {"status": "skipped", "reason": "FEC_API_KEY is not configured."}
+    query = _safe_live_fec_query_from_question(question, facts)
+    if not query:
+        return {
+            "status": "skipped",
+            "reason": "No safe committee ID, candidate ID, or employer/company signal could be inferred for a constrained OpenFEC lookup.",
+        }
+    from backend.models import SourceAuditLog
+    from backend.services.fec_client import fetch_fec_transactions, redact_query, build_fec_request_params, sanitize_fec_error
+    from backend.services.repository import insert_records
+
+    audit = SourceAuditLog(
+        source_system="FEC",
+        operation_type="ai_live_fec_lookup",
+        query_json=to_json(query),
+        status="running",
+    )
+    db.add(audit)
+    db.commit()
+    db.refresh(audit)
+    try:
+        fetched = fetch_fec_transactions(query)
+        inserted = insert_records(db, "FEC", fetched.records, source_url="https://api.open.fec.gov/v1/schedules/schedule_a/")
+        audit.status = "completed" if not fetched.errors and not inserted.get("errors") else "partial"
+        audit.completed_at = datetime.utcnow()
+        audit.pages_processed = fetched.pages_processed
+        audit.raw_records_fetched = fetched.raw_records_fetched
+        audit.inserted_count = inserted.get("inserted_count", 0)
+        audit.duplicate_count = inserted.get("duplicate_count", 0)
+        errors = [sanitize_fec_error(error) for error in (fetched.errors + inserted.get("errors", []))]
+        audit.error_message = "; ".join(errors[:5]) if errors else None
+        run = FECQueryRun(
+            audit_log_id=audit.id,
+            query_json=to_json(query),
+            request_metadata_json=to_json({"endpoint": "schedule_a", "request_params": redact_query(build_fec_request_params(query))}),
+            result_json=to_json({"query": query, "records": fetched.records, "errors": errors[:10]}),
+            normalized_transaction_ids_json=to_json(inserted.get("transaction_ids", [])),
+            status=audit.status,
+            pages_processed=fetched.pages_processed,
+            raw_records_fetched=fetched.raw_records_fetched,
+            inserted_count=inserted.get("inserted_count", 0),
+            duplicate_count=inserted.get("duplicate_count", 0),
+            error_message=audit.error_message,
+            completed_at=datetime.utcnow(),
+        )
+        db.add(audit)
+        db.add(run)
+        db.commit()
+        return {
+            "status": audit.status,
+            "query": redact_query(build_fec_request_params(query)),
+            "fec_query_run_id": run.id,
+            "pages_processed": fetched.pages_processed,
+            "raw_records_fetched": fetched.raw_records_fetched,
+            "inserted_count": inserted.get("inserted_count", 0),
+            "duplicate_count": inserted.get("duplicate_count", 0),
+            "errors": errors[:5],
+        }
+    except Exception as exc:
+        audit.status = "failed"
+        audit.completed_at = datetime.utcnow()
+        audit.error_message = sanitize_fec_error(exc)
+        db.add(audit)
+        db.commit()
+        return {"status": "failed", "query": query, "error": audit.error_message}
 
 
 def _extract_response_text(payload: dict) -> str:
@@ -460,7 +597,7 @@ def build_web_context(question: str, facts: dict) -> dict:
                 "Content-Type": "application/json",
             },
             json={
-                "model": os.getenv("OPENAI_WEB_MODEL", os.getenv("OPENAI_MODEL", "gpt-4.1")),
+                "model": os.getenv("OPENAI_WEB_MODEL", os.getenv("OPENAI_MODEL", "gpt-5-mini")),
                 "tools": [{"type": os.getenv("OPENAI_WEB_SEARCH_TOOL", "web_search")}],
                 "tool_choice": "auto",
                 "input": prompt,
@@ -533,19 +670,38 @@ def generate_brief(db: Session, question: str, filters: dict, insight_type: str 
     filters = filters or {}
     include_web_context = bool(filters.pop("include_web_context", True))
     facts = build_question_facts(db, question, filters)
+    live_fec_lookup = {"status": "not_needed"}
+    evidence_count = facts.get("matching_record_count") or facts.get("normalized_records_available") or 0
+    if filters.get("watchlist_id") and not evidence_count:
+        try:
+            live_fec_lookup = {
+                "status": "tracker_refresh",
+                "result": run_watchlist(db, int(filters["watchlist_id"]), run_type="ai_fallback", live=True),
+            }
+            facts = build_question_facts(db, question, filters)
+            evidence_count = facts.get("matching_record_count") or facts.get("normalized_records_available") or 0
+        except Exception as exc:
+            live_fec_lookup = {"status": "tracker_refresh_failed", "error": str(exc)}
+    if not evidence_count:
+        live_fec_lookup = _live_fec_fallback(db, question, facts)
+        if live_fec_lookup.get("status") in {"completed", "partial"}:
+            facts = build_question_facts(db, question, filters)
+    facts["live_fec_lookup"] = live_fec_lookup
     web_context = build_web_context(question, facts) if include_web_context else {"enabled": False, "status": "not_requested", "summary": "", "citations": []}
     facts["web_context"] = web_context
     try:
         from openai import OpenAI
 
-        model_name = os.getenv("OPENAI_MODEL", "gpt-4.1")
+        model_name = os.getenv("OPENAI_MODEL", "gpt-5-mini")
         client = OpenAI()
         prompt = {
             "role": "user",
             "content": (
                 "Answer like a sharp campaign-finance intelligence analyst, not a database narrator. "
                 "Use local public-record facts for donation/transaction claims. "
+                "If facts.selection_method is tracked_watchlist_records, lead with 'Based on tracked records' and explain the tracker run date/counts. "
                 "Use web_context for broader strategic context, entity background, issue relevance, likely aliases, committees, offices, and next research angles. "
+                "Use facts.live_fec_lookup to explain whether a live OpenFEC lookup was attempted, completed, skipped, or failed. "
                 "Do not treat web/news context as verified contribution evidence, but do use it to make the analysis more insightful. "
                 "Start with a direct answer. If local contribution facts do not answer the question, say that clearly, then use web context to explain what is known publicly and what exact data pull would close the gap. "
                 "Use source_record_id values as evidence references when discussing specific records. "

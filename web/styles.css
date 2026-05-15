@@ -574,6 +574,33 @@ pre {
   line-height: 1.5;
 }
 
+.tracker-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.tracker-action-row {
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 12px;
+}
+
+.tracker-action-row strong {
+  color: #0f172a;
+  margin-right: auto;
+}
+
+.nested-panel {
+  margin-top: 16px;
+}
+
 .two-column-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

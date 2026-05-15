@@ -117,6 +117,21 @@ def _ensure_sqlite_indexes() -> None:
             "CREATE INDEX IF NOT EXISTS ix_source_audit_logs_completed_status "
             "ON source_audit_logs (status, completed_at DESC)",
         ),
+        (
+            "ix_watchlists_enabled_next_run",
+            "CREATE INDEX IF NOT EXISTS ix_watchlists_enabled_next_run "
+            "ON watchlists (enabled, next_run_at)",
+        ),
+        (
+            "ix_watchlist_runs_watchlist_started",
+            "CREATE INDEX IF NOT EXISTS ix_watchlist_runs_watchlist_started "
+            "ON watchlist_runs (watchlist_id, started_at DESC)",
+        ),
+        (
+            "ix_watchlist_run_transactions_watchlist",
+            "CREATE INDEX IF NOT EXISTS ix_watchlist_run_transactions_watchlist "
+            "ON watchlist_run_transactions (watchlist_id, normalized_transaction_id)",
+        ),
     ]
     with engine.begin() as conn:
         for name, statement in statements:

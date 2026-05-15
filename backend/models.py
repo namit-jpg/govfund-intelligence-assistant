@@ -179,6 +179,13 @@ class Watchlist(Base):
     date_to: Mapped[date | None] = mapped_column(Date, nullable=True)
     min_amount: Mapped[float | None] = mapped_column(Float, nullable=True)
     sources: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    status: Mapped[str] = mapped_column(String(30), default="active")
+    cadence: Mapped[str] = mapped_column(String(40), default="daily")
+    cycle: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    max_records: Mapped[int] = mapped_column(Integer, default=250)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -191,6 +198,48 @@ class WatchlistEntity(Base):
     entity_name: Mapped[str] = mapped_column(String(255))
     normalized_entity_name: Mapped[str] = mapped_column(String(255))
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class WatchlistRun(Base):
+    __tablename__ = "watchlist_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    watchlist_id: Mapped[int] = mapped_column(ForeignKey("watchlists.id"), index=True)
+    source_system: Mapped[str] = mapped_column(String(20), default="FEC")
+    status: Mapped[str] = mapped_column(String(30), default="running")
+    run_type: Mapped[str] = mapped_column(String(40), default="manual")
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    pages_processed: Mapped[int] = mapped_column(Integer, default=0)
+    raw_records_fetched: Mapped[int] = mapped_column(Integer, default=0)
+    inserted_count: Mapped[int] = mapped_column(Integer, default=0)
+    duplicate_count: Mapped[int] = mapped_column(Integer, default=0)
+    matched_count: Mapped[int] = mapped_column(Integer, default=0)
+    fec_query_run_ids_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    audit_log_ids_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class WatchlistRunTransaction(Base):
+    __tablename__ = "watchlist_run_transactions"
+    __table_args__ = (
+        UniqueConstraint(
+            "watchlist_run_id",
+            "normalized_transaction_id",
+            name="uq_watchlist_run_transaction",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    watchlist_run_id: Mapped[int] = mapped_column(ForeignKey("watchlist_runs.id"), index=True)
+    watchlist_id: Mapped[int] = mapped_column(ForeignKey("watchlists.id"), index=True)
+    normalized_transaction_id: Mapped[int] = mapped_column(ForeignKey("normalized_transactions.id"), index=True)
+    matched_entity_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    matched_entity_type: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    matched_on_field: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    match_confidence: Mapped[float] = mapped_column(Float, default=0)
+    match_reason: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class AISummary(Base):

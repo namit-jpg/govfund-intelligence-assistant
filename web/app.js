@@ -1,7 +1,7 @@
 const page = document.querySelector("#page");
 const toast = document.querySelector("#toast");
 const apiStatus = document.querySelector("#apiStatus");
-const state = { page: "ai", runs: [], selectedRunId: null, runDetail: null, overview: null };
+const state = { page: "tracker", runs: [], selectedRunId: null, runDetail: null, overview: null, watchlists: [] };
 
 const money = (value) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(value || 0));
@@ -192,6 +192,25 @@ const fecColumns = [
   { key: "source_record_id", label: "Source Record ID" },
 ];
 
+const trackerColumns = [
+  { key: "transaction_date", label: "Date" },
+  { key: "amount", label: "Amount", money: true },
+  { key: "matched_entity_name", label: "Matched Entity" },
+  { key: "confidence_label", label: "Confidence" },
+  { key: "matched_on_field", label: "Matched Field" },
+  { key: "contributor_name", label: "Contributor" },
+  { key: "contributor_employer", label: "Employer / Company Signal" },
+  { key: "recipient_name", label: "Recipient" },
+  { key: "committee_name", label: "Committee" },
+  { key: "cycle", label: "Cycle" },
+  { key: "source_record_id", label: "Source Record ID" },
+];
+
+async function loadWatchlists() {
+  state.watchlists = await api("/watchlists");
+  return state.watchlists;
+}
+
 async function loadRuns() {
   state.runs = await api("/ingestion/fec-runs?limit=20");
   if (!state.selectedRunId && state.runs.length) state.selectedRunId = state.runs[0].id;
@@ -348,7 +367,7 @@ async function renderSearch() {
     <section class="panel">
       <div class="section-title"><h2>Search Donations</h2><span>Contributor, employer/business, recipient, committee, or source ID</span></div>
       <form id="searchForm" class="form-grid">
-        <label class="span-all">Search term<input name="q" placeholder="Example: Alex Mealer, AECOM, Sammons, C008..." /></label>
+        <label class="span-all">Search term<input name="q" placeholder="Example: AECOM, Fluor, Sammons, C008..." /></label>
         <label>Source<select name="source_system"><option>All</option><option>FEC</option><option>TEC</option></select></label>
         <label>Contributor<input name="contributor_name" /></label>
         <label>Employer / company signal<input name="contributor_employer" /></label>
@@ -395,7 +414,10 @@ async function renderSearch() {
 }
 
 async function renderAi() {
-  const status = await api("/ai/status");
+  const [status, watchlists] = await Promise.all([api("/ai/status"), loadWatchlists()]);
+  const watchlistOptions = [`<option value="">Use general local records</option>`]
+    .concat(watchlists.map((item) => `<option value="${item.id}">${esc(item.name)}</option>`))
+    .join("");
   page.innerHTML = `
     <section class="panel ai-hero">
       <div class="section-title"><h2>AI Intelligence Query</h2><span>Detailed analyst memo</span></div>
@@ -405,10 +427,13 @@ async function renderAi() {
           ? `<div class="error">${esc(status.message || "AI is not configured. Add OPENAI_API_KEY to enable AI briefing.")}</div>`
           : `<form id="aiForm" class="ai-query-form">
               <label>What do you want to know?
-                <textarea name="question" rows="5" placeholder="Example: Who has donated to Alex Mealer in 2026?"></textarea>
+                <textarea name="question" rows="5" placeholder="Example: What changed in this tracker over the last cycle, and which recipients matter most?"></textarea>
+              </label>
+              <label>Evidence scope
+                <select name="watchlist_id">${watchlistOptions}</select>
               </label>
               <div class="prompt-examples" aria-label="Example prompts">
-                <button type="button" data-prompt="Who has donated to Alex Mealer in 2026?">Alex Mealer 2026 donors</button>
+                <button type="button" data-prompt="Summarize the latest tracked donation activity and explain what changed.">Tracker summary</button>
                 <button type="button" data-prompt="Compare employer/company signals for AECOM and Fluor in the current FEC records.">Compare companies</button>
                 <button type="button" data-prompt="Which recipients in the current records appear most relevant to infrastructure, construction, energy, roads, water, or public works?">Infrastructure relevance</button>
               </div>
@@ -436,7 +461,7 @@ async function renderAi() {
           question: values.question,
           insight_type: "freeform_campaign_finance_question",
           include_web_context: Boolean(values.include_web_context),
-          filters: {},
+          filters: values.watchlist_id ? { watchlist_id: Number(values.watchlist_id) } : {},
         }),
       });
       document.querySelector("#aiOutput").innerHTML = `<section class="panel ai-panel">${renderMarkdown(result.output_text || result.message || "")}</section>`;
@@ -454,7 +479,22 @@ async function renderAi() {
   });
 }
 
-function renderTracker() {
+async function renderTracker() {
+  const watchlists = await loadWatchlists();
+  const trackerRows = watchlists
+    .map((item) => {
+      const latest = item.latest_run || {};
+      return {
+        id: item.id,
+        name: item.name,
+        cadence: item.cadence,
+        enabled: item.enabled ? "Yes" : "No",
+        last_run_at: item.last_run_at || "Not run yet",
+        latest_status: latest.status || "No run",
+        matched_count: latest.matched_count || 0,
+        raw_records_fetched: latest.raw_records_fetched || 0,
+      };
+    });
   page.innerHTML = `
     <section class="panel">
       <div class="section-title"><h2>Donation Tracker</h2><span>Monitor competitors, legislators, PACs, committees, and recipients</span></div>
@@ -463,12 +503,20 @@ function renderTracker() {
           <textarea name="businesses" rows="4" placeholder="One per line: AECOM&#10;Fluor&#10;Sammons"></textarea>
         </label>
         <label>Legislators / recipients / PACs to monitor, up to 20
-          <textarea name="recipients" rows="4" placeholder="One per line: Alex Mealer&#10;Friends of Ben McAdams"></textarea>
+          <textarea name="recipients" rows="4" placeholder="One per line: Friends of Ben McAdams&#10;Heartland Values PAC"></textarea>
+        </label>
+        <label>Committee IDs for precise FEC monitoring
+          <textarea name="committee_ids" rows="3" placeholder="One per line: C008..."></textarea>
+        </label>
+        <label>Candidate IDs for precise FEC monitoring
+          <textarea name="candidate_ids" rows="3" placeholder="One per line: H4TX..."></textarea>
         </label>
         <div class="form-grid">
           <label>From date<input name="date_from" type="date" /></label>
           <label>To date<input name="date_to" type="date" /></label>
-          <label>Monitoring cadence<select name="cadence"><option>Monthly</option><option>Historical only</option></select></label>
+          <label>Cycle<input name="cycle" placeholder="2026" /></label>
+          <label>Max records per run<input name="max_records" type="number" min="25" max="5000" step="25" value="250" /></label>
+          <label>Monitoring cadence<select name="cadence"><option value="daily">Daily</option><option value="historical_only">Historical only</option></select></label>
           <label>Alert threshold<input name="min_amount" type="number" min="0" step="100" placeholder="Optional amount" /></label>
         </div>
         <button class="primary" type="submit">Save Monitoring List</button>
@@ -480,7 +528,37 @@ function renderTracker() {
         <div class="tracker-step"><strong>3</strong><h3>Review Activity</h3><p>See new donations, recipient activity, source IDs, duplicates, and data quality flags.</p></div>
         <div class="tracker-step"><strong>4</strong><h3>Export Report</h3><p>Generate Excel-ready evidence packs for printing and client review.</p></div>
       </div>
-      <div class="warning">This tracker saves monitoring lists for review. Automated alert delivery is not enabled yet; that remains a production hardening step.</div>
+      <div class="warning">Daily monitoring runs from the existing GCP VM timer. Export reports contain only source-backed records matched to the selected tracker.</div>
+    </section>
+    <section class="panel">
+      <div class="section-title"><h2>Saved Trackers</h2><span>Run, inspect, and export monitored evidence</span></div>
+      ${table(trackerRows, [
+        { key: "id", label: "ID" },
+        { key: "name", label: "Tracker" },
+        { key: "cadence", label: "Cadence" },
+        { key: "enabled", label: "Enabled" },
+        { key: "latest_status", label: "Latest Run" },
+        { key: "matched_count", label: "Matched" },
+        { key: "raw_records_fetched", label: "Raw Fetched" },
+        { key: "last_run_at", label: "Last Run At" },
+      ])}
+      <div id="trackerActions" class="tracker-actions">
+        ${
+          watchlists.length
+            ? watchlists
+                .map(
+                  (item) => `<div class="tracker-action-row">
+                    <strong>#${esc(item.id)} ${esc(item.name)}</strong>
+                    <button class="secondary small-button" data-run-watchlist="${item.id}" type="button">Run Now</button>
+                    <button class="ghost small-button" data-view-watchlist="${item.id}" type="button">View Evidence</button>
+                    <a class="secondary button-link small-button" href="/exports/watchlists/${item.id}.xlsx">Export Tracker Report</a>
+                  </div>`,
+                )
+                .join("")
+            : `<div class="empty">No trackers saved yet.</div>`
+        }
+      </div>
+      <div id="trackerEvidence"></div>
     </section>
   `;
   document.querySelector("#trackerForm").addEventListener("submit", async (event) => {
@@ -488,9 +566,13 @@ function renderTracker() {
     const values = Object.fromEntries(new FormData(event.target).entries());
     const businesses = String(values.businesses || "").split(/\r?\n/).map((v) => v.trim()).filter(Boolean).slice(0, 10);
     const recipients = String(values.recipients || "").split(/\r?\n/).map((v) => v.trim()).filter(Boolean).slice(0, 20);
+    const committeeIds = String(values.committee_ids || "").split(/\r?\n/).map((v) => v.trim()).filter(Boolean).slice(0, 20);
+    const candidateIds = String(values.candidate_ids || "").split(/\r?\n/).map((v) => v.trim()).filter(Boolean).slice(0, 20);
     const entities = [
       ...businesses.map((name) => ({ entity_name: name, entity_type: "EMPLOYER_SIGNAL" })),
       ...recipients.map((name) => ({ entity_name: name, entity_type: "RECIPIENT" })),
+      ...committeeIds.map((name) => ({ entity_name: name, entity_type: "COMMITTEE", committee_id: name })),
+      ...candidateIds.map((name) => ({ entity_name: name, entity_type: "CANDIDATE", candidate_id: name })),
     ];
     if (!entities.length) {
       document.querySelector("#trackerResult").innerHTML = `<div class="error">Add at least one business, employer signal, legislator, PAC, committee, or recipient.</div>`;
@@ -503,10 +585,44 @@ function renderTracker() {
         watchlist_type: "donation_monitor",
         description: "Client-facing donation monitoring list",
         entities,
-        filters: { date_from: values.date_from, date_to: values.date_to, cadence: values.cadence, min_amount: values.min_amount },
+        cadence: values.cadence || "daily",
+        max_records: Number(values.max_records || 250),
+        enabled: true,
+        filters: {
+          date_from: values.date_from,
+          date_to: values.date_to,
+          cadence: values.cadence,
+          min_amount: values.min_amount,
+          cycle: values.cycle,
+          max_records: Number(values.max_records || 250),
+        },
       }),
     });
-    document.querySelector("#trackerResult").innerHTML = `<div class="toast">Monitoring list saved as watchlist #${esc(result.id)}. Use Search Donations and Data & Exports for current evidence review.</div>`;
+    document.querySelector("#trackerResult").innerHTML = `<div class="toast">Monitoring list saved as tracker #${esc(result.id)}. Run it now or let the daily VM timer refresh it.</div>`;
+    await renderTracker();
+  });
+  document.querySelectorAll("[data-run-watchlist]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      button.textContent = "Running...";
+      try {
+        const result = await api(`/watchlists/${button.dataset.runWatchlist}/run?live=true`, { method: "POST" });
+        showToast(`Tracker run ${result.status}: ${result.matched_count || 0} matched records, ${result.raw_records_fetched || 0} raw fetched.`);
+        await renderTracker();
+      } catch (error) {
+        showToast(error.message, true);
+      }
+    });
+  });
+  document.querySelectorAll("[data-view-watchlist]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const data = await api(`/watchlists/${button.dataset.viewWatchlist}/transactions?limit=250`);
+      document.querySelector("#trackerEvidence").innerHTML = `
+        <section class="panel nested-panel">
+          <div class="section-title"><h2>Tracker Evidence</h2><span>${esc(data.total || 0)} matched records</span></div>
+          ${table(data.items || [], trackerColumns)}
+        </section>`;
+    });
   });
 }
 
@@ -556,8 +672,8 @@ async function render() {
   document.querySelectorAll(".tab").forEach((button) => button.classList.toggle("active", button.dataset.page === state.page));
   page.innerHTML = `<section class="panel"><div class="empty">Loading ${esc(state.page)}...</div></section>`;
   try {
-    if (state.page === "ai") await renderAi();
-    else if (state.page === "tracker") renderTracker();
+    if (state.page === "tracker") await renderTracker();
+    else if (state.page === "ai") await renderAi();
     else if (state.page === "fec") await renderFec();
     else if (state.page === "overview") await renderOverview();
     else if (state.page === "search") await renderSearch();
