@@ -47,7 +47,13 @@ def _ensure_sqlite_columns() -> None:
                 column_type = column.type.compile(dialect=engine.dialect)
                 statement = f"ALTER TABLE {_quote(table.name)} ADD COLUMN {_quote(column.name)} {column_type}"
                 logger.info("Adding missing SQLite column %s.%s", table.name, column.name)
-                conn.execute(text(statement))
+                try:
+                    conn.execute(text(statement))
+                except SQLAlchemyError as exc:
+                    if "duplicate column name" in str(exc).lower():
+                        logger.info("SQLite column %s.%s was added by another worker.", table.name, column.name)
+                        continue
+                    logger.warning("Could not add SQLite column %s.%s: %s", table.name, column.name, exc)
 
 
 def _ensure_sqlite_indexes() -> None:
@@ -156,7 +162,13 @@ def _configure_sqlite_runtime() -> None:
 
 
 def init_database() -> None:
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+    except SQLAlchemyError as exc:
+        if DATABASE_URL.startswith("sqlite") and "already exists" in str(exc).lower():
+            logger.info("SQLite schema was initialized by another worker.")
+        else:
+            raise
     if DATABASE_URL.startswith("sqlite"):
         _configure_sqlite_runtime()
         _ensure_sqlite_columns()
