@@ -3,29 +3,23 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>GovFund Intelligence Assistant</title>
+    <title>Capitol File Assistant</title>
     <link rel="stylesheet" href="/app/styles.css" />
   </head>
   <body>
     <header class="app-header">
       <div>
-        <p class="eyebrow">Funding Intelligence</p>
-        <h1>GovFund Intelligence Assistant</h1>
-        <p class="subhead">Track public donation activity, export evidence, and generate source-aware briefings.</p>
+        <h1>Capitol File Assistant</h1>
+        <p class="subhead provider-line">Provided by Share Good Tech</p>
       </div>
-      <div id="apiStatus" class="status-pill">Checking API</div>
     </header>
 
     <main>
-      <section class="caveat">
-        FEC employer fields represent the employer reported by individual contributors. They do not prove direct corporate donations.
-      </section>
-
       <nav class="tabs" aria-label="Portal navigation">
         <button class="tab active" data-page="tracker">Tracker</button>
         <button class="tab" data-page="ai">AI Intelligence Query</button>
-        <button class="tab" data-page="overview">Overview</button>
         <button class="tab" data-page="search">Search Donations</button>
+        <button class="tab" data-page="overview">Overview</button>
         <button class="tab" data-page="fec">FEC Data Pull</button>
         <button class="tab" data-page="data">Data & Exports</button>
       </nav>

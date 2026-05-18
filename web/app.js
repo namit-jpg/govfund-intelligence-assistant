@@ -367,7 +367,7 @@ async function renderSearch() {
     <section class="panel">
       <div class="section-title"><h2>Search Donations</h2><span>Contributor, employer/business, recipient, committee, or source ID</span></div>
       <form id="searchForm" class="form-grid">
-        <label class="span-all">Search term<input name="q" placeholder="Example: AECOM, Fluor, Sammons, C008..." /></label>
+        <label class="span-all">Search term<input name="q" placeholder="Contributor, employer, recipient, committee, or source ID" /></label>
         <label>Source<select name="source_system"><option>All</option><option>FEC</option><option>TEC</option></select></label>
         <label>Contributor<input name="contributor_name" /></label>
         <label>Employer / company signal<input name="contributor_employer" /></label>
@@ -420,25 +420,20 @@ async function renderAi() {
     .join("");
   page.innerHTML = `
     <section class="panel ai-hero">
-      <div class="section-title"><h2>AI Intelligence Query</h2><span>Detailed analyst memo</span></div>
-      <div class="ai-note">Ask a plain-language question. The AI now produces a fuller analyst memo: donation facts come from locally ingested FEC/TEC records, while web/news context prioritizes independent news, campaign-finance trackers, watchdog/nonprofit sources, and public records over company marketing pages. Employer fields remain employer/company signals, not proof of direct corporate giving.</div>
+      <div class="section-title"><h2>AI Intelligence Query</h2><span>Provide analysis and insights</span></div>
+      <div class="ai-note">Ask a plain-language question. Donation facts come from locally ingested FEC/TEC records. Optional web/news context can help with broader public context, including contracting questions, but local campaign-finance records and federal contracting data are separate evidence streams.</div>
       ${
         !status.enabled
           ? `<div class="error">${esc(status.message || "AI is not configured. Add OPENAI_API_KEY to enable AI briefing.")}</div>`
           : `<form id="aiForm" class="ai-query-form">
               <label>What do you want to know?
-                <textarea name="question" rows="5" placeholder="Example: What changed in this tracker over the last cycle, and which recipients matter most?"></textarea>
+                <textarea name="question" rows="5"></textarea>
               </label>
               <label>Evidence scope
                 <select name="watchlist_id">${watchlistOptions}</select>
               </label>
-              <div class="prompt-examples" aria-label="Example prompts">
-                <button type="button" data-prompt="Summarize the latest tracked donation activity and explain what changed.">Tracker summary</button>
-                <button type="button" data-prompt="Compare employer/company signals for AECOM and Fluor in the current FEC records.">Compare companies</button>
-                <button type="button" data-prompt="Which recipients in the current records appear most relevant to infrastructure, construction, energy, roads, water, or public works?">Infrastructure relevance</button>
-              </div>
               <label class="inline-check"><input name="include_web_context" type="checkbox" checked /> Include web/news context for richer analysis</label>
-              <button class="primary" type="submit">Generate Detailed Intelligence Memo</button>
+              <button class="primary" type="submit">Generate Analysis</button>
             </form>
             <div id="aiOutput"></div>`
       }
@@ -450,8 +445,8 @@ async function renderAi() {
     event.preventDefault();
     const button = form.querySelector("button[type='submit']");
     button.disabled = true;
-    button.textContent = "Generating Answer...";
-    document.querySelector("#aiOutput").innerHTML = `<section class="panel ai-panel"><div class="empty">Searching local records, gathering public context, and writing a detailed intelligence memo...</div></section>`;
+    button.textContent = "Generating Analysis...";
+    document.querySelector("#aiOutput").innerHTML = `<section class="panel ai-panel"><div class="empty">Searching local records, gathering public context, and preparing analysis...</div></section>`;
     
     try {
       const values = Object.fromEntries(new FormData(event.target).entries());
@@ -469,13 +464,8 @@ async function renderAi() {
       document.querySelector("#aiOutput").innerHTML = `<section class="panel ai-panel error">${esc(error.message)}</section>`;
     } finally {
       button.disabled = false;
-      button.textContent = "Generate Detailed Intelligence Memo";
+      button.textContent = "Generate Analysis";
     }
-  });
-  document.querySelectorAll("[data-prompt]").forEach((button) => {
-    button.addEventListener("click", () => {
-      form.querySelector("textarea[name='question']").value = button.dataset.prompt;
-    });
   });
 }
 
@@ -499,24 +489,24 @@ async function renderTracker() {
     <section class="panel">
       <div class="section-title"><h2>Donation Tracker</h2><span>Monitor competitors, legislators, PACs, committees, and recipients</span></div>
       <form id="trackerForm" class="tracker-form">
-        <label>Business / employer signals to monitor, up to 10
-          <textarea name="businesses" rows="4" placeholder="One per line: AECOM&#10;Fluor&#10;Sammons"></textarea>
+        <label>Business / employer signals to monitor
+          <textarea name="businesses" rows="4" placeholder="Enter one per line"></textarea>
         </label>
-        <label>Legislators / recipients / PACs to monitor, up to 20
-          <textarea name="recipients" rows="4" placeholder="One per line: Friends of Ben McAdams&#10;Heartland Values PAC"></textarea>
+        <label>Legislators / recipients / PACs to monitor
+          <textarea name="recipients" rows="4" placeholder="Enter one per line"></textarea>
         </label>
         <label>Committee IDs for precise FEC monitoring
-          <textarea name="committee_ids" rows="3" placeholder="One per line: C008..."></textarea>
+          <textarea name="committee_ids" rows="3" placeholder="Enter one per line"></textarea>
         </label>
         <label>Candidate IDs for precise FEC monitoring
-          <textarea name="candidate_ids" rows="3" placeholder="One per line: H4TX..."></textarea>
+          <textarea name="candidate_ids" rows="3" placeholder="Enter one per line"></textarea>
         </label>
         <div class="form-grid">
           <label>From date<input name="date_from" type="date" /></label>
           <label>To date<input name="date_to" type="date" /></label>
           <label>Cycle<input name="cycle" placeholder="2026" /></label>
           <label>Max records per run<input name="max_records" type="number" min="25" max="5000" step="25" value="250" /></label>
-          <label>Monitoring cadence<select name="cadence"><option value="daily">Daily</option><option value="historical_only">Historical only</option></select></label>
+          <label>Monitoring frequency<select name="cadence"><option value="monthly">Monthly</option><option value="daily">Daily</option><option value="historical_only">Historical only</option></select></label>
           <label>Alert threshold<input name="min_amount" type="number" min="0" step="100" placeholder="Optional amount" /></label>
         </div>
         <button class="primary" type="submit">Save Monitoring List</button>
@@ -528,7 +518,6 @@ async function renderTracker() {
         <div class="tracker-step"><strong>3</strong><h3>Review Activity</h3><p>See new donations, recipient activity, source IDs, duplicates, and data quality flags.</p></div>
         <div class="tracker-step"><strong>4</strong><h3>Export Report</h3><p>Generate Excel-ready evidence packs for printing and client review.</p></div>
       </div>
-      <div class="warning">Daily monitoring runs from the existing GCP VM timer. Export reports contain only source-backed records matched to the selected tracker.</div>
     </section>
     <section class="panel">
       <div class="section-title"><h2>Saved Trackers</h2><span>Run, inspect, and export monitored evidence</span></div>
@@ -692,12 +681,14 @@ document.querySelectorAll(".tab").forEach((button) => {
 
 api("/health")
   .then(() => {
-    apiStatus.textContent = "API connected";
+    if (apiStatus) apiStatus.textContent = "API connected";
   })
   .catch(() => {
-    apiStatus.textContent = "API offline";
-    apiStatus.style.background = "#fee2e2";
-    apiStatus.style.color = "#991b1b";
+    if (apiStatus) {
+      apiStatus.textContent = "API offline";
+      apiStatus.style.background = "#fee2e2";
+      apiStatus.style.color = "#991b1b";
+    }
   });
 
 render();

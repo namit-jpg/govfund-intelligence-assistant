@@ -652,6 +652,16 @@ def _store_run(db: Session, insight_type: str, filters: dict, output_text: str, 
     db.commit()
 
 
+def _chat_completion_options(model_name: str, messages: list[dict]) -> dict:
+    options = {
+        "model": model_name,
+        "messages": messages,
+    }
+    if not model_name.lower().startswith("gpt-5"):
+        options["temperature"] = 0.05
+    return options
+
+
 def generate_brief(db: Session, question: str, filters: dict, insight_type: str = "custom_question") -> dict:
     guard = check_question(question)
     if not guard["allowed"]:
@@ -720,9 +730,7 @@ def generate_brief(db: Session, question: str, filters: dict, insight_type: str 
                 f"Facts JSON: {json.dumps(facts, default=str)}"
             ),
         }
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=[
+        messages = [
                 {
                     "role": "system",
                     "content": (
@@ -732,9 +740,8 @@ def generate_brief(db: Session, question: str, filters: dict, insight_type: str 
                     ),
                 },
                 prompt,
-            ],
-            temperature=0.05,
-        )
+            ]
+        response = client.chat.completions.create(**_chat_completion_options(model_name, messages))
         output = response.choices[0].message.content or ""
         _store_run(db, insight_type, filters or {}, output, facts, model_name)
         return {
