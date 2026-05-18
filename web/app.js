@@ -518,7 +518,6 @@ async function renderTracker() {
         <div class="tracker-step"><strong>3</strong><h3>Review Activity</h3><p>See new donations, recipient activity, source IDs, duplicates, and data quality flags.</p></div>
         <div class="tracker-step"><strong>4</strong><h3>Export Report</h3><p>Generate Excel-ready evidence packs for printing and client review.</p></div>
       </div>
-      <div class="warning">Scheduled monitoring runs from the existing GCP VM timer. Export reports contain only source-backed records matched to the selected tracker.</div>
     </section>
     <section class="panel">
       <div class="section-title"><h2>Saved Trackers</h2><span>Run, inspect, and export monitored evidence</span></div>
