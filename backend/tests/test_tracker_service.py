@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from backend.db import Base
-from backend.models import FECQueryRun, SourceAuditLog, WatchlistRun, WatchlistRunTransaction
+from backend.models import FECQueryRun, SourceAuditLog, Watchlist, WatchlistRun, WatchlistRunTransaction
 from backend.schemas import WatchlistCreateRequest
 from backend.services.tracker_service import create_watchlist_from_payload, linked_watchlist_transactions, run_watchlist
 
@@ -69,5 +69,33 @@ def test_watchlist_run_fetches_fec_and_links_matching_transactions(monkeypatch):
         assert db.query(SourceAuditLog).filter(SourceAuditLog.operation_type == "watchlist_fec_ingest").count() == 1
         assert db.query(FECQueryRun).count() == 1
         assert len(linked_watchlist_transactions(db, watchlist.id)) == 1
+    finally:
+        db.close()
+
+
+def test_monthly_watchlist_run_sets_next_run_about_30_days(monkeypatch):
+    db = make_session()
+    monkeypatch.delenv("FEC_API_KEY", raising=False)
+    try:
+        watchlist = create_watchlist_from_payload(
+            db,
+            WatchlistCreateRequest(
+                name="Monthly tracker",
+                watchlist_type="donation_monitor",
+                entities=[{"entity_name": "Pape-Dawson Engineers", "entity_type": "EMPLOYER_SIGNAL"}],
+                filters={"cycle": "2026", "max_records": 50, "cadence": "monthly"},
+                cadence="monthly",
+                max_records=50,
+            ),
+        )
+
+        result = run_watchlist(db, watchlist.id, run_type="manual", live=True)
+        updated = db.query(Watchlist).filter(Watchlist.id == watchlist.id).one()
+
+        assert result["status"] == "partial"
+        assert updated.cadence == "monthly"
+        assert updated.last_run_at is not None
+        assert updated.next_run_at is not None
+        assert 29 <= (updated.next_run_at - updated.last_run_at).days <= 30
     finally:
         db.close()

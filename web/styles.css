@@ -67,7 +67,7 @@ body {
 }
 
 .app-header h1 {
-  margin: 5px 0 6px;
+  margin: 0 0 6px;
   font-size: clamp(28px, 3vw, 40px);
   letter-spacing: 0;
   line-height: 1.05;
@@ -86,6 +86,11 @@ body {
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.08em;
+}
+
+.provider-line {
+  font-size: 14px;
+  font-weight: 650;
 }
 
 main {

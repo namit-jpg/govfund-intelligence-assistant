@@ -139,6 +139,15 @@ def create_watchlist_from_payload(db: Session, payload) -> Watchlist:
     return watchlist
 
 
+def _next_run_at_for_cadence(cadence: str | None, completed_at: datetime | None = None) -> datetime | None:
+    if cadence == "historical_only":
+        return None
+    base = completed_at or datetime.utcnow()
+    if cadence == "monthly":
+        return base + timedelta(days=30)
+    return base + timedelta(days=1)
+
+
 def _base_watchlist_filters(watchlist: Watchlist) -> dict:
     filters = _parse_json(watchlist.filters_json, {})
     return {
@@ -399,7 +408,7 @@ def run_watchlist(db: Session, watchlist_id: int, run_type: str = "manual", live
         run.fec_query_run_ids_json = to_json(fec_run_ids)
         run.error_message = "; ".join(errors[:5]) if errors else None
         watchlist.last_run_at = run.completed_at
-        watchlist.next_run_at = run.completed_at + timedelta(days=1) if watchlist.enabled and watchlist.cadence == "daily" else None
+        watchlist.next_run_at = _next_run_at_for_cadence(watchlist.cadence, run.completed_at) if watchlist.enabled else None
         db.add(run)
         db.add(watchlist)
         db.commit()
@@ -420,7 +429,7 @@ def run_due_watchlists(db: Session) -> list[dict]:
         .filter(
             or_(Watchlist.enabled.is_(True), Watchlist.enabled.is_(None)),
             or_(Watchlist.status == "active", Watchlist.status.is_(None)),
-            or_(Watchlist.cadence == "daily", Watchlist.cadence.is_(None)),
+            or_(Watchlist.cadence.in_(["daily", "monthly"]), Watchlist.cadence.is_(None)),
             or_(Watchlist.next_run_at.is_(None), Watchlist.next_run_at <= now),
         )
         .all()
