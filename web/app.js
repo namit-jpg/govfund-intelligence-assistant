@@ -350,33 +350,19 @@ async function renderFec() {
 function renderOverviewCharts(data) {
   const employers = (data.top_employers || []).map((row) => ({ name: row.employer_company_signal, amount: row.total_amount, count: row.transaction_count }));
   const recipients = (data.top_recipients || []).map((row) => ({ name: row.recipient_name, amount: row.total_amount, count: row.transaction_count }));
-  const sources = (data.source_split || []).map((row) => ({ name: row.source_system, amount: row.total_amount, count: row.transaction_count }));
-  const topics = (data.topic_distribution || []).map((row) => ({ name: row.topic_tag, amount: row.total_amount, count: row.transaction_count }));
   return [
-    chartBars("Source Split", sources),
-    chartBars("Top Employer / Company Signals", employers),
     chartBars("Top Recipients", recipients),
-    chartBars("Topic Tags", topics, "count"),
+    chartBars("Top Employer / Company Signals", employers),
   ].join("");
 }
 
 async function renderOverview() {
   const data = await api("/analytics/overview");
-  const kpis = data.kpis || {};
   page.innerHTML = `
     <section class="panel">
-      <div class="section-title"><h2>Dataset Overview</h2><span>All stored ingested records, not a single query</span></div>
-      <div class="ai-note">This page summarizes the current local database across all completed imports and FEC snapshots. The total amount is a point-in-time aggregate of stored records, not a fresh live FEC total and not limited to the last visible query.</div>
-      <div class="metric-grid">
-        ${metric("Total Records", kpis.total_records || 0)}
-        ${metric("Total Amount", money(kpis.total_contribution_amount))}
-        ${metric("FEC Records", kpis.fec_records || 0)}
-        ${metric("Unique Recipients", kpis.unique_recipients || 0)}
-        ${metric("Employer / Company Signals", kpis.unique_employer_company_signals || 0)}
-        ${metric("Quality Warnings", kpis.data_quality_warning_count || 0)}
-      </div>
+      <div class="section-title"><h2>Dashboard</h2><span>Top recipients and employer signals</span></div>
+      <div class="chart-grid">${renderOverviewCharts(data)}</div>
     </section>
-    <section class="panel"><div class="chart-grid">${renderOverviewCharts(data)}</div></section>
     <section class="panel">
       <div class="section-title"><h2>Recent High-Value Records</h2><span>Top source-backed rows</span></div>
       ${table(data.recent_high_value || [], fecColumns)}
