@@ -47,3 +47,5 @@ def test_sparse_question_facts_use_public_context_mode_without_no_data_note():
     assert "coverage_note" not in facts
     assert "suggested_next_data_pull" not in facts
     assert "Coverage Limitations" not in BRIEF_SECTIONS
+    assert "Client Demo Talking Points" not in BRIEF_SECTIONS
+    assert "Executive Briefing Notes" in BRIEF_SECTIONS

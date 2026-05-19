@@ -16,6 +16,16 @@ const esc = (value) =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 
+const aiSectionHeadings = new Set([
+  "Direct Answer",
+  "Campaign Finance Signals",
+  "Public Context and News Signals",
+  "Strategic Interpretation",
+  "Executive Briefing Notes",
+  "Recommended Actions and Follow-Up Questions",
+  "Recommended Next Research Steps",
+]);
+
 function inlineMarkdown(text) {
   return esc(text)
     .replace(
@@ -30,6 +40,7 @@ function renderMarkdown(text) {
   const lines = String(text || "").split(/\r?\n/);
   const html = [];
   let listOpen = false;
+  let sectionCount = 0;
 
   const closeList = () => {
     if (listOpen) {
@@ -48,7 +59,18 @@ function renderMarkdown(text) {
     if (heading) {
       closeList();
       const level = Math.min(heading[1].length + 1, 4);
-      html.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
+      if (level === 2) {
+        sectionCount += 1;
+        html.push(`<h2><span>${sectionCount}</span>${inlineMarkdown(heading[2])}</h2>`);
+      } else {
+        html.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
+      }
+      continue;
+    }
+    if (aiSectionHeadings.has(trimmed)) {
+      closeList();
+      sectionCount += 1;
+      html.push(`<h2><span>${sectionCount}</span>${inlineMarkdown(trimmed)}</h2>`);
       continue;
     }
     const bullet = trimmed.match(/^[-*]\s+(.+)$/);

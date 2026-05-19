@@ -33,8 +33,8 @@ BRIEF_SECTIONS = [
     "Campaign Finance Signals",
     "Public Context and News Signals",
     "Strategic Interpretation",
-    "Client Demo Talking Points",
-    "Suggested Follow-Up Questions",
+    "Executive Briefing Notes",
+    "Recommended Actions and Follow-Up Questions",
 ]
 
 STOP_TERMS = {
@@ -714,7 +714,8 @@ def generate_brief(db: Session, question: str, filters: dict, insight_type: str 
                 "Make comparisons where possible: who appears more active, which recipients recur, whether activity is concentrated or diffuse, whether the timing looks clustered, and whether the pattern is likely a data-coverage issue. "
                 "Avoid generic boilerplate. Make the output feel like something a public affairs, government relations, or legal/compliance team could actually use. "
                 "For the Relevant Public Context section, cite web URLs from web_context.citations when available and say if web context failed or was not requested. "
-                f"Return markdown with exactly these sections: {', '.join(BRIEF_SECTIONS)}.\n\n"
+                "Use polished production-grade language. Never refer to this as a demo, prototype, or test response. "
+                f"Return markdown with exactly these sections as level-two markdown headings: {', '.join(BRIEF_SECTIONS)}.\n\n"
                 f"Question: {question}\n"
                 f"Facts JSON: {json.dumps(facts, default=str)}"
             ),
