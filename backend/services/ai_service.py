@@ -30,12 +30,11 @@ FOOTER = (
 
 BRIEF_SECTIONS = [
     "Direct Answer",
-    "Tracked Dataset Evidence",
-    "Live OpenFEC Lookup",
-    "Public Web Context",
+    "Campaign Finance Signals",
+    "Public Context and News Signals",
     "Strategic Interpretation",
-    "Coverage Limitations",
-    "Recommended Next Research Steps",
+    "Client Demo Talking Points",
+    "Suggested Follow-Up Questions",
 ]
 
 STOP_TERMS = {
@@ -424,17 +423,7 @@ def build_question_facts(db: Session, question: str, filters: dict | None = None
     facts["question"] = question
     facts["selection_method"] = "question_inferred_local_fec_search"
     if not rows:
-        facts["coverage_note"] = (
-            "No matching local ingested FEC records were found for the inferred terms. "
-            "No matching local ingested contribution records were found for the inferred terms. "
-            "Web/news context may still help identify aliases, offices, committees, and next searches, but it is not contribution evidence."
-        )
-        facts["suggested_next_data_pull"] = {
-            "source": "OpenFEC Schedule A",
-            "cycle": facts["context"].get("cycle"),
-            "search_terms": facts["context"].get("question_terms", []),
-            "recommended_filters": "Use candidate/committee/recipient-specific OpenFEC identifiers when available; otherwise run a narrowed recipient or committee search and review aliases.",
-        }
+        facts["analysis_mode"] = "public_context_first_when_local_records_are_sparse"
     return facts
 
 
@@ -711,9 +700,9 @@ def generate_brief(db: Session, question: str, filters: dict, insight_type: str 
                 "Use local public-record facts for donation/transaction claims. "
                 "If facts.selection_method is tracked_watchlist_records, lead with 'Based on tracked records' and explain the tracker run date/counts. "
                 "Use web_context for broader strategic context, entity background, issue relevance, likely aliases, committees, offices, and next research angles. "
-                "Use facts.live_fec_lookup to explain whether a live OpenFEC lookup was attempted, completed, skipped, or failed. "
+                "Use facts.live_fec_lookup internally, but do not turn the answer into a system status report unless the lookup yielded useful records. "
                 "Do not treat web/news context as verified contribution evidence, but do use it to make the analysis more insightful. "
-                "Start with a direct answer. If local contribution facts do not answer the question, say that clearly, then use web context to explain what is known publicly and what exact data pull would close the gap. "
+                "Start with a direct answer. If local contribution facts are sparse, do not apologize, do not say the database has no data, and do not frame the answer as inaccurate. Pivot smoothly to public context and clearly label what comes from public context versus campaign-finance records. "
                 "Use source_record_id values as evidence references when discussing specific records. "
                 "Do not invent records, use general model knowledge as evidence, or infer donor intent. "
                 "Do not allege bribery, corruption, pay-to-play, illegality, or direct corporate donations unless a provided source explicitly proves that. "
