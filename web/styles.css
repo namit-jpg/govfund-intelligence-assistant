@@ -578,79 +578,64 @@ pre {
 
 .ai-brief {
   display: grid;
-  gap: 16px;
+  gap: 12px;
   color: var(--text);
-  padding: 20px;
-  background:
-    linear-gradient(180deg, #f8fbff 0, #ffffff 18rem),
-    #ffffff;
+  padding: 24px 28px 28px;
+  background: #ffffff;
 }
 
 .ai-brief h2 {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin: 10px -4px 2px;
-  padding: 16px 18px;
-  color: #ffffff;
-  background: linear-gradient(135deg, #1e3a8a, #0f766e);
-  border-radius: 12px;
-  box-shadow: 0 16px 30px rgba(30, 58, 138, 0.18);
+  gap: 8px;
+  margin: 20px 0 4px;
+  padding: 0 0 8px;
+  color: #0f1f4d;
+  border-bottom: 1px solid #dbe7f5;
   font-size: 20px;
-  line-height: 1.2;
+  line-height: 1.25;
   letter-spacing: 0;
 }
 
+.ai-brief h2:first-child {
+  margin-top: 0;
+}
+
 .ai-brief h2 span {
-  display: inline-grid;
-  place-items: center;
-  flex: 0 0 34px;
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  font-size: 14px;
+  color: #2563eb;
+  font-size: 12px;
   font-weight: 900;
+  letter-spacing: 0.04em;
 }
 
 .ai-brief h3,
 .ai-brief h4 {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   color: #172554;
-  border-left: 5px solid var(--blue);
-  padding: 12px 14px;
-  background: linear-gradient(90deg, #eff6ff, #f8fbff);
-  border-radius: 0 8px 8px 0;
+  padding: 0;
   font-size: 17px;
   letter-spacing: 0;
 }
 
 .ai-brief p {
-  margin: 0;
-  line-height: 1.68;
+  margin: 0 0 4px;
+  line-height: 1.7;
   color: #1e293b;
   font-size: 15px;
 }
 
 .ai-brief ul {
-  margin: 0;
-  padding-left: 0;
-  display: grid;
-  gap: 10px;
-  list-style: none;
+  margin: 2px 0 8px;
+  padding-left: 22px;
+  display: block;
+  list-style: disc;
 }
 
 .ai-brief li {
-  position: relative;
-  line-height: 1.62;
+  line-height: 1.68;
   color: #1e293b;
-  background: #ffffff;
-  border: 1px solid #d8e3f0;
-  border-left: 5px solid #0f766e;
-  border-radius: 10px;
-  padding: 12px 14px 12px 18px;
-  box-shadow: var(--shadow-sm);
+  padding-left: 4px;
+  margin: 6px 0;
 }
 
 .ai-brief strong {
