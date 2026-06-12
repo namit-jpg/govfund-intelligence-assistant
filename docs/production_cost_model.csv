@@ -1,0 +1,31 @@
+Category,Item,Technology / Vendor,Pilot (1 client),Production (1-3 clients),Scale (multi-client + county PDFs),Billing type,Notes
+Cloud compute,Application server,"GCP Compute Engine e2-standard-2 (2 vCPU / 8 GB) OR AWS t3.large equivalent",45,95,180,Fixed monthly,Runs FastAPI + nginx reverse proxy + background tracker jobs; US region (us-central1 or us-east1)
+Cloud compute,Background jobs / PDF workers,"Same VM or separate e2-standard-2 worker",0,45,95,Fixed monthly,Separate worker recommended once county PDF ingestion and daily trackers run concurrently
+Database,Primary database,"GCP Cloud SQL PostgreSQL (db-custom-2-7680) OR AWS RDS db.t3.medium",75,120,220,Fixed monthly,Replace SQLite for production; includes automated backups and point-in-time recovery
+Object storage,Raw PDFs + exports archive,"GCP Cloud Storage OR AWS S3 (US)",5,25,75,Variable,~$0.02/GB/mo; pilot ~100 GB; production ~500 GB; scale ~2 TB with county filings
+Object storage,Egress / bandwidth,"Cloud provider egress",10,35,90,Variable,Excel exports + PDF downloads; spikes during client reporting cycles
+Networking,Load balancer + TLS,"GCP HTTPS LB OR AWS ALB + Let's Encrypt / managed cert",18,25,40,Fixed monthly,Required for production HTTPS and health checks
+Networking,Domain + DNS,"Cloudflare or Route 53",2,5,10,Fixed monthly,Custom domain for client-facing portal
+Secrets,API keys and credentials,"GCP Secret Manager OR AWS Secrets Manager",2,5,10,Fixed monthly,FEC_API_KEY OPENAI_API_KEY DB credentials
+Monitoring,Errors + uptime,"Sentry (Team) + UptimeRobot or GCP Monitoring",0,35,60,Fixed monthly,Alert on ingestion failures OpenFEC 429s tracker job errors
+Logging,Centralized logs,"GCP Cloud Logging OR AWS CloudWatch",5,15,35,Variable,30-90 day retention for audit troubleshooting
+Backups,DB + file backups,"Cloud SQL backups + GCS/S3 lifecycle",5,15,40,Fixed monthly,Off-site retention for compliance and recovery
+AI / APIs,OpenAI — AI briefings,"OpenAI API (gpt-5-mini + optional web search)",75,250,800,Variable,Assumes pilot ~50 queries/mo; production ~200/mo; scale ~800/mo with web context
+AI / APIs,OpenAI — tracker / batch jobs,"OpenAI API (if used in automation)",0,50,200,Variable,Optional; most tracker work is FEC API not LLM
+AI / APIs,FEC data,"OpenFEC API (api.open.fec.gov)",0,0,0,Included,Free with FEC_API_KEY; rate limits apply
+AI / APIs,County PDF OCR (future),"Google Document AI OR AWS Textract",0,40,150,Variable,~$1.50 per 1,000 pages; only for scanned PDFs; digital PDFs use free extraction
+AI / APIs,Employer enrichment (future optional),"Apollo / Clearbit / similar B2B data API",0,100,400,Variable,Per-lookup pricing; use only on watchlisted donors not all records
+Third-party,Email / notifications (future),"SendGrid or AWS SES",0,15,40,Variable,Alert delivery when real alerts ship
+Third-party,Auth / SSO (future),"Auth0 or Clerk",0,25,80,Fixed monthly,Required before multi-user client production
+Third-party,Payment processing,"Stripe (if Share Good Tech bills in-app)",0,0,0,Per transaction,2.9% + $0.30 per charge; not infra unless platform collects payments
+DevOps,Container registry,"GCP Artifact Registry OR AWS ECR",2,5,10,Fixed monthly,Docker image from Dockerfile in repo
+DevOps,CI/CD,"GitHub Actions (included) or Cloud Build",0,10,25,Fixed monthly,Deploy on push; smoke tests
+Support buffer,Incident / patch window,"WarpDrive ops time (not vendor bill)",0,0,0,Contractor,Include in WarpDrive SOW hours not pass-through unless agreed
+,,,,,,,
+MONTHLY DIRECT INFRA SUBTOTAL (excl. contractor labor),,,242,895,2560,,
+MONTHLY DIRECT INFRA + AI at mid usage,,,~300,~1100,~3200,,
+ANNUAL DIRECT INFRA (production tier estimate),,,,~13200,,,Use for Net Project Margin planning
+ONE-TIME SETUP (production hardening),,,,,,,
+One-time,Postgres migration + Alembic,WarpDrive engineering,0,0,0,Labor,Schema migration from SQLite; not a recurring vendor cost
+One-time,Auth + HTTPS + monitoring setup,WarpDrive engineering,0,0,0,Labor,Production readiness items in PRODUCTION_READINESS.md
+One-time,County PDF ingestion adapters (per county pattern),WarpDrive engineering,0,0,0,Labor,Fort Bend / Chambers / Harris etc.; labor not hosting
