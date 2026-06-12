@@ -30,12 +30,11 @@ FOOTER = (
 
 BRIEF_SECTIONS = [
     "Direct Answer",
-    "Tracked Dataset Evidence",
-    "Live OpenFEC Lookup",
-    "Public Web Context",
+    "Campaign Finance Signals",
+    "Public Context and News Signals",
     "Strategic Interpretation",
-    "Coverage Limitations",
-    "Recommended Next Research Steps",
+    "Executive Briefing Notes",
+    "Recommended Actions and Follow-Up Questions",
 ]
 
 STOP_TERMS = {
@@ -424,17 +423,7 @@ def build_question_facts(db: Session, question: str, filters: dict | None = None
     facts["question"] = question
     facts["selection_method"] = "question_inferred_local_fec_search"
     if not rows:
-        facts["coverage_note"] = (
-            "No matching local ingested FEC records were found for the inferred terms. "
-            "No matching local ingested contribution records were found for the inferred terms. "
-            "Web/news context may still help identify aliases, offices, committees, and next searches, but it is not contribution evidence."
-        )
-        facts["suggested_next_data_pull"] = {
-            "source": "OpenFEC Schedule A",
-            "cycle": facts["context"].get("cycle"),
-            "search_terms": facts["context"].get("question_terms", []),
-            "recommended_filters": "Use candidate/committee/recipient-specific OpenFEC identifiers when available; otherwise run a narrowed recipient or committee search and review aliases.",
-        }
+        facts["analysis_mode"] = "public_context_first_when_local_records_are_sparse"
     return facts
 
 
@@ -711,21 +700,23 @@ def generate_brief(db: Session, question: str, filters: dict, insight_type: str 
                 "Use local public-record facts for donation/transaction claims. "
                 "If facts.selection_method is tracked_watchlist_records, lead with 'Based on tracked records' and explain the tracker run date/counts. "
                 "Use web_context for broader strategic context, entity background, issue relevance, likely aliases, committees, offices, and next research angles. "
-                "Use facts.live_fec_lookup to explain whether a live OpenFEC lookup was attempted, completed, skipped, or failed. "
+                "Use facts.live_fec_lookup internally, but do not turn the answer into a system status report unless the lookup yielded useful records. "
                 "Do not treat web/news context as verified contribution evidence, but do use it to make the analysis more insightful. "
-                "Start with a direct answer. If local contribution facts do not answer the question, say that clearly, then use web context to explain what is known publicly and what exact data pull would close the gap. "
+                "Start with a direct answer. If local contribution facts are sparse, do not apologize, do not say the database has no data, and do not frame the answer as inaccurate. Pivot smoothly to public context and clearly label what comes from public context versus campaign-finance records. "
                 "Use source_record_id values as evidence references when discussing specific records. "
                 "Do not invent records, use general model knowledge as evidence, or infer donor intent. "
                 "Do not allege bribery, corruption, pay-to-play, illegality, or direct corporate donations unless a provided source explicitly proves that. "
                 "When FEC employer fields are relevant, call them employer/company signals reported by individual contributors. "
                 "Be substantially more verbose than a short summary. Write a client-ready analyst memo, roughly 900-1,500 words when enough facts/context exist. "
-                "Each section should contain multiple detailed bullets or short paragraphs, not one-line observations. "
+                "Write primarily in cohesive paragraphs. Use bullets only for compact evidence lists, concrete action items, or short grouped takeaways. "
+                "Do not format every observation as its own bullet; group related facts, context, and implications into readable narrative paragraphs under each heading. "
                 "For each major claim, explain: what was observed, why it may matter, what source or record supports it, and what uncertainty remains. "
                 "Use named entities, amounts, dates/months, source IDs, local record counts, industry context, public-policy relevance, and concrete next research steps. "
                 "Make comparisons where possible: who appears more active, which recipients recur, whether activity is concentrated or diffuse, whether the timing looks clustered, and whether the pattern is likely a data-coverage issue. "
                 "Avoid generic boilerplate. Make the output feel like something a public affairs, government relations, or legal/compliance team could actually use. "
                 "For the Relevant Public Context section, cite web URLs from web_context.citations when available and say if web context failed or was not requested. "
-                f"Return markdown with exactly these sections: {', '.join(BRIEF_SECTIONS)}.\n\n"
+                "Use polished production-grade language. Never refer to this as a demo, prototype, or test response. "
+                f"Return markdown with exactly these sections as level-two markdown headings: {', '.join(BRIEF_SECTIONS)}.\n\n"
                 f"Question: {question}\n"
                 f"Facts JSON: {json.dumps(facts, default=str)}"
             ),

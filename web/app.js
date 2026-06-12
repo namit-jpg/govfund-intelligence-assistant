@@ -16,6 +16,16 @@ const esc = (value) =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 
+const aiSectionHeadings = new Set([
+  "Direct Answer",
+  "Campaign Finance Signals",
+  "Public Context and News Signals",
+  "Strategic Interpretation",
+  "Executive Briefing Notes",
+  "Recommended Actions and Follow-Up Questions",
+  "Recommended Next Research Steps",
+]);
+
 function inlineMarkdown(text) {
   return esc(text)
     .replace(
@@ -30,6 +40,7 @@ function renderMarkdown(text) {
   const lines = String(text || "").split(/\r?\n/);
   const html = [];
   let listOpen = false;
+  let sectionCount = 0;
 
   const closeList = () => {
     if (listOpen) {
@@ -48,7 +59,18 @@ function renderMarkdown(text) {
     if (heading) {
       closeList();
       const level = Math.min(heading[1].length + 1, 4);
-      html.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
+      if (level === 2) {
+        sectionCount += 1;
+        html.push(`<h2><span>${sectionCount}</span>${inlineMarkdown(heading[2])}</h2>`);
+      } else {
+        html.push(`<h${level}>${inlineMarkdown(heading[2])}</h${level}>`);
+      }
+      continue;
+    }
+    if (aiSectionHeadings.has(trimmed)) {
+      closeList();
+      sectionCount += 1;
+      html.push(`<h2><span>${sectionCount}</span>${inlineMarkdown(trimmed)}</h2>`);
       continue;
     }
     const bullet = trimmed.match(/^[-*]\s+(.+)$/);
@@ -328,33 +350,19 @@ async function renderFec() {
 function renderOverviewCharts(data) {
   const employers = (data.top_employers || []).map((row) => ({ name: row.employer_company_signal, amount: row.total_amount, count: row.transaction_count }));
   const recipients = (data.top_recipients || []).map((row) => ({ name: row.recipient_name, amount: row.total_amount, count: row.transaction_count }));
-  const sources = (data.source_split || []).map((row) => ({ name: row.source_system, amount: row.total_amount, count: row.transaction_count }));
-  const topics = (data.topic_distribution || []).map((row) => ({ name: row.topic_tag, amount: row.total_amount, count: row.transaction_count }));
   return [
-    chartBars("Source Split", sources),
-    chartBars("Top Employer / Company Signals", employers),
     chartBars("Top Recipients", recipients),
-    chartBars("Topic Tags", topics, "count"),
+    chartBars("Top Employer / Company Signals", employers),
   ].join("");
 }
 
 async function renderOverview() {
   const data = await api("/analytics/overview");
-  const kpis = data.kpis || {};
   page.innerHTML = `
     <section class="panel">
-      <div class="section-title"><h2>Dataset Overview</h2><span>All stored ingested records, not a single query</span></div>
-      <div class="ai-note">This page summarizes the current local database across all completed imports and FEC snapshots. The total amount is a point-in-time aggregate of stored records, not a fresh live FEC total and not limited to the last visible query.</div>
-      <div class="metric-grid">
-        ${metric("Total Records", kpis.total_records || 0)}
-        ${metric("Total Amount", money(kpis.total_contribution_amount))}
-        ${metric("FEC Records", kpis.fec_records || 0)}
-        ${metric("Unique Recipients", kpis.unique_recipients || 0)}
-        ${metric("Employer / Company Signals", kpis.unique_employer_company_signals || 0)}
-        ${metric("Quality Warnings", kpis.data_quality_warning_count || 0)}
-      </div>
+      <div class="section-title"><h2>Dashboard</h2><span>Top recipients and employer signals</span></div>
+      <div class="chart-grid">${renderOverviewCharts(data)}</div>
     </section>
-    <section class="panel"><div class="chart-grid">${renderOverviewCharts(data)}</div></section>
     <section class="panel">
       <div class="section-title"><h2>Recent High-Value Records</h2><span>Top source-backed rows</span></div>
       ${table(data.recent_high_value || [], fecColumns)}
